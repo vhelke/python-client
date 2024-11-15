@@ -2,10 +2,16 @@
 from coreapi.codecs.base import BaseCodec
 from coreapi.compat import urlparse
 from coreapi.utils import DownloadedFile, guess_extension
-import cgi
+from email.message import Message
+from urllib.parse import unquote
 import os
 import posixpath
 import tempfile
+
+
+
+
+
 
 
 def _unique_output_path(path):
@@ -44,17 +50,27 @@ def _get_filename_from_content_disposition(content_disposition):
     """
     Determine an output filename based on the `Content-Disposition` header.
     """
-    params = value, params = cgi.parse_header(content_disposition)
+    if not content_disposition:
+        return None
 
+    # Create Message object and set the header
+    msg = Message()
+    msg['Content-Disposition'] = content_disposition
+
+    # Get parameters as dictionary
+    params = dict(msg.get_params(header='content-disposition'))
+
+    # First try filename* (RFC 5987)
     if 'filename*' in params:
         try:
             charset, lang, filename = params['filename*'].split('\'', 2)
-            filename = urlparse.unquote(filename)
+            filename = unquote(filename)
             filename = filename.encode('iso-8859-1').decode(charset)
             return _safe_filename(filename)
         except (ValueError, LookupError):
             pass
 
+    # Then try filename
     if 'filename' in params:
         filename = params['filename']
         return _safe_filename(filename)
